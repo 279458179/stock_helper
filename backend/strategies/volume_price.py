@@ -1,15 +1,19 @@
 """
 量价配合策略模块
 分析集合竞价期间的量价关系，识别看涨信号
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import pandas as pd
 import numpy as np
 from typing import Dict, Tuple
 import logging
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 使用 pathlib 确保跨平台路径兼容
+backend_path = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_path))
+
 from core.config import VOLUME_PRICE_THRESHOLDS
 
 logger = logging.getLogger(__name__)

@@ -1,11 +1,12 @@
 """
 工具函数模块
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import pandas as pd
 import numpy as np
 from datetime import datetime, time
 from typing import Optional
-import os
+from pathlib import Path
 
 
 def format_price(price: float) -> str:

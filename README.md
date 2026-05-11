@@ -2,23 +2,59 @@
 
 一款专注于A股集合竞价的智能分析工具，在9:15-9:25竞价时段结束后，快速筛选出看涨潜力股。
 
+**跨平台兼容**：支持 Windows、macOS、Linux
+
 ## 功能特点
 
 - **时效性强**: 竞价结束后立即分析，开盘前完成筛选
 - **智能分析**: 多策略综合评分（量价配合、技术指标、资金流向）
 - **精准筛选**: 价格≤20元，看涨评分排序，选出Top 5
 - **操作建议**: 每只股票提供详细的操作建议和风险提示
+- **买卖指导**: 包含买入时机、价位、卖出条件、止盈止损等详细建议
 
 ## 快速开始
 
 ### 1. 安装依赖
 
 ```bash
+# Windows
 cd backend
 pip install -r requirements.txt
+
+# macOS/Linux
+cd backend
+pip3 install -r requirements.txt
 ```
 
 ### 2. 使用方法
+
+#### 方式一：使用启动脚本（推荐）
+
+```bash
+# Windows
+python run.py analyze          # 立即执行分析
+python run.py watch            # 监控模式
+python run.py status           # 显示当前状态
+python run.py test             # 运行模拟测试
+
+# macOS/Linux
+python3 run.py analyze         # 立即执行分析
+python3 run.py watch           # 监控模式
+python3 run.py status          # 显示当前状态
+python3 run.py test            # 运行模拟测试
+```
+
+#### 方式二：直接运行 backend/main.py
+
+```bash
+# Windows
+cd backend
+python main.py analyze
+
+# macOS/Linux
+cd backend
+python3 main.py analyze
+```
 
 #### 立即执行分析
 ```bash
@@ -70,6 +106,21 @@ python main.py analyze --export result.csv
 - 价格动量因子
 - 波动率因子
 - 相对强度因子
+
+## 买卖操作建议说明
+
+分析报告中包含以下买卖建议：
+
+- **买入条件**: 何时买入的具体条件说明
+- **买入价位**: 建议买入的价格区间
+- **买入时机**: 最佳买入时间段
+- **卖出条件**: 达到什么条件卖出
+- **卖出目标**: 目标卖出价位
+- **卖出时机**: 最佳卖出时间段
+- **止盈目标**: 预期盈利目标价
+- **止损价位**: 风险控制止损价
+- **持有周期**: 建议持有时间
+- **建议仓位**: 推荐的仓位比例
 
 ## 输出示例
 

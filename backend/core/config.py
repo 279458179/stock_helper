@@ -1,14 +1,23 @@
 """
 股票集合竞价智能分析工具配置模块
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import os
+import sys
+from pathlib import Path
 from datetime import time
 
-# 项目根目录
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# 项目根目录（使用 pathlib 确保跨平台兼容）
+# config.py 位于 backend/core/ 目录，需要向上两级获取 backend 目录
+BASE_DIR = Path(__file__).resolve().parent.parent  # backend 目录
+PROJECT_ROOT = BASE_DIR.parent  # stock-helper 目录
 
 # 数据缓存目录
-CACHE_DIR = os.path.join(BASE_DIR, 'cache')
+CACHE_DIR = BASE_DIR / 'cache'
+
+# 日志目录和文件
+LOG_DIR = BASE_DIR / 'logs'
+LOG_FILE = LOG_DIR / 'analyzer.log'
 
 # A股交易时间配置
 PRE_MARKET_START = time(9, 15)   # 集合竞价开始
@@ -56,12 +65,23 @@ OUTPUT_FORMAT = 'table'          # 输出格式：table, json, text
 
 # 日志配置
 LOG_LEVEL = 'INFO'
-LOG_FILE = os.path.join(BASE_DIR, 'logs', 'analyzer.log')
 
 # 确保必要目录存在
 def ensure_dirs():
-    """确保必要的目录存在"""
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    """确保必要的目录存在（跨平台兼容）"""
+    # 使用 pathlib 的 mkdir 方法，parents=True 会创建父目录
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+# 在模块加载时确保目录存在
 ensure_dirs()
+
+# 获取日志文件路径（返回字符串以兼容 logging 模块）
+def get_log_file_path() -> str:
+    """获取日志文件路径（返回字符串格式以兼容 logging）"""
+    return str(LOG_FILE)
+
+# 获取缓存目录路径（返回字符串以兼容其他模块）
+def get_cache_dir_path() -> str:
+    """获取缓存目录路径（返回字符串格式）"""
+    return str(CACHE_DIR)

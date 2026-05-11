@@ -1,6 +1,7 @@
 """
 资金流向分析策略模块
 分析主力资金、大单资金流向，识别资金动向
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import pandas as pd
 import numpy as np
@@ -8,9 +9,12 @@ from typing import Dict, Tuple
 import logging
 import akshare as ak
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 使用 pathlib 确保跨平台路径兼容
+backend_path = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_path))
+
 from core.config import CAPITAL_FLOW_THRESHOLDS
 
 logger = logging.getLogger(__name__)

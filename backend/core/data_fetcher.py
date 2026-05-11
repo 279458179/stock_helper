@@ -1,18 +1,19 @@
 """
 股票数据获取模块
 使用akshare获取A股实时行情和历史数据
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import akshare as ak
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import os
+from pathlib import Path
 import json
 from typing import List, Dict, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 import logging
 
-from .config import CACHE_DIR, MAX_STOCK_PRICE
+from .config import get_cache_dir_path, MAX_STOCK_PRICE
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,8 @@ class DataFetcher:
             use_cache: 是否使用缓存
         """
         self.use_cache = use_cache
-        self.cache_file = os.path.join(CACHE_DIR, 'stock_list.json')
+        self.cache_dir = Path(get_cache_dir_path())
+        self.cache_file = self.cache_dir / 'stock_list.json'
 
     def get_all_a_stocks(self) -> pd.DataFrame:
         """
@@ -142,7 +144,7 @@ class DataFetcher:
 
     def batch_get_history(self, stock_codes: List[str], days: int = 30) -> Dict[str, pd.DataFrame]:
         """
-        批量获取多只股票的历史数据（并行）
+        批量获取多只股票的历史数据（串行，避免并发崩溃）
 
         Args:
             stock_codes: 股票代码列表
@@ -151,25 +153,21 @@ class DataFetcher:
         Returns:
             字典：{股票代码: 历史数据DataFrame}
         """
+        import time
         result = {}
-        logger.info(f"并行获取 {len(stock_codes)} 只股票历史数据...")
+        logger.info(f"串行获取 {len(stock_codes)} 只股票历史数据...")
 
-        # 减少并发线程数以避免崩溃
-        max_workers = 3
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_code = {
-                executor.submit(self.get_stock_history, code, days): code
-                for code in stock_codes
-            }
-
-            for future in as_completed(future_to_code):
-                code = future_to_code[future]
-                try:
-                    data = future.result()
-                    if not data.empty:
-                        result[code] = data
-                except Exception as e:
-                    logger.warning(f"股票 {code} 获取失败: {e}")
+        # 串行获取以避免py_mini_racer并发崩溃
+        for i, code in enumerate(stock_codes):
+            try:
+                logger.info(f"获取 {code} ({i+1}/{len(stock_codes)})...")
+                data = self.get_stock_history(code, days)
+                if not data.empty:
+                    result[code] = data
+                # 添加小延迟避免请求过快
+                time.sleep(0.5)
+            except Exception as e:
+                logger.warning(f"股票 {code} 获取失败: {e}")
 
         logger.info(f"成功获取 {len(result)} 只股票历史数据")
         return result
@@ -251,7 +249,7 @@ class DataFetcher:
         if not self.use_cache:
             return
 
-        cache_path = os.path.join(CACHE_DIR, filename)
+        cache_path = self.cache_dir / filename
         try:
             with open(cache_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, default=str)
@@ -273,12 +271,12 @@ class DataFetcher:
         if not self.use_cache:
             return None
 
-        cache_path = os.path.join(CACHE_DIR, filename)
-        if not os.path.exists(cache_path):
+        cache_path = self.cache_dir / filename
+        if not cache_path.exists():
             return None
 
         # 检查缓存是否过期
-        file_mtime = datetime.fromtimestamp(os.path.getmtime(cache_path))
+        file_mtime = datetime.fromtimestamp(cache_path.stat().st_mtime)
         if datetime.now() - file_mtime > timedelta(minutes=max_age_minutes):
             logger.info("缓存已过期")
             return None

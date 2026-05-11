@@ -1,5 +1,6 @@
 """
 股票集合竞价智能分析工具 - 命令行入口
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import sys
 import os
@@ -8,27 +9,31 @@ import logging
 from datetime import datetime
 import time
 import pandas as pd
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
-# 添加路径
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 添加路径（使用 pathlib 确保跨平台兼容）
+backend_path = Path(__file__).resolve().parent
+sys.path.insert(0, str(backend_path))
 
-from core.config import LOG_FILE, LOG_LEVEL, CACHE_DIR, SELECT_TOP_N, MAX_STOCK_PRICE, DATA_UPDATE_INTERVAL
+from core.config import (
+    get_log_file_path, get_cache_dir_path, LOG_LEVEL,
+    SELECT_TOP_N, MAX_STOCK_PRICE, DATA_UPDATE_INTERVAL
+)
 from core.data_fetcher import DataFetcher
 from core.pre_market import PreMarketAnalyzer
 from strategies.composite import CompositeStrategy
 
-# 确保目录存在
-os.makedirs(CACHE_DIR, exist_ok=True)
-os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+# 确保目录存在（使用 pathlib）
+Path(get_cache_dir_path()).mkdir(parents=True, exist_ok=True)
+Path(get_log_file_path()).parent.mkdir(parents=True, exist_ok=True)
 
-# 配置日志
+# 配置日志（使用跨平台路径）
 logging.basicConfig(
     level=LOG_LEVEL,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler(LOG_FILE, encoding='utf-8')
+        logging.FileHandler(get_log_file_path(), encoding='utf-8')
     ]
 )
 
@@ -200,6 +205,25 @@ class SimpleAnalyzer:
             report.append(f"  综合评分: {stock['composite_score']:.2f}分")
             report.append(f"  风险等级: {stock.get('risk_level', '未知')}")
             report.append(f"  操作建议: {stock['recommendation']}")
+
+            # 添加详细买卖建议
+            buy_sell = stock.get('buy_sell_advice', {})
+            if buy_sell:
+                report.append("")
+                report.append("  ========== 买卖操作建议 ==========")
+                report.append(f"  【买入条件】{buy_sell.get('buy_condition', '暂无建议')}")
+                report.append(f"  【买入价位】{buy_sell.get('buy_price_range', '暂无建议')}")
+                report.append(f"  【买入时机】{buy_sell.get('buy_time', '暂无建议')}")
+                report.append("")
+                report.append(f"  【卖出条件】{buy_sell.get('sell_condition', '暂无建议')}")
+                report.append(f"  【卖出目标】{buy_sell.get('sell_price_target', '暂无建议')}")
+                report.append(f"  【卖出时机】{buy_sell.get('sell_time', '暂无建议')}")
+                report.append("")
+                report.append(f"  【止盈目标】{buy_sell.get('take_profit', '暂无建议')}")
+                report.append(f"  【止损价位】{buy_sell.get('stop_loss', '暂无建议')}")
+                report.append(f"  【持有周期】{buy_sell.get('holding_period', '暂无建议')}")
+                report.append(f"  【建议仓位】{buy_sell.get('position_size', '暂无建议')}")
+                report.append("  ===================================")
 
         report.append("")
         report.append("-" * 60)

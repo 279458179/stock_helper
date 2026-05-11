@@ -1,6 +1,7 @@
 """
 综合评分策略模块
 整合量价、技术指标、资金流向等多个因子，进行综合智能评分
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import pandas as pd
 import numpy as np
@@ -8,9 +9,12 @@ from typing import Dict, List, Tuple
 import logging
 from datetime import datetime
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 使用 pathlib 确保跨平台路径兼容
+backend_path = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_path))
+
 from core.config import STRATEGY_WEIGHTS, SELECT_TOP_N
 from strategies.volume_price import VolumePriceStrategy
 from strategies.technical import TechnicalStrategy
@@ -76,6 +80,11 @@ class CompositeStrategy:
             # 计算风险等级
             risk_level = self._calculate_risk_level(stock_data, history_data)
 
+            # 生成买卖操作建议
+            buy_sell_advice = self._generate_buy_sell_advice(
+                stock_data, history_data, composite_score, risk_level, all_signals
+            )
+
             return {
                 'composite_score': round(composite_score, 2),
                 'volume_price_score': vp_score,
@@ -85,6 +94,7 @@ class CompositeStrategy:
                 'all_signals': all_signals,
                 'recommendation': recommendation,
                 'risk_level': risk_level,
+                'buy_sell_advice': buy_sell_advice,
                 'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
 
@@ -93,7 +103,8 @@ class CompositeStrategy:
             return {
                 'composite_score': 0,
                 'recommendation': '分析出错',
-                'risk_level': '未知'
+                'risk_level': '未知',
+                'buy_sell_advice': {'buy': '暂无建议', 'sell': '暂无建议'}
             }
 
     def _calculate_composite_factor(self, stock_data: Dict, history_data: pd.DataFrame) -> float:
@@ -357,6 +368,184 @@ class CompositeStrategy:
         except Exception as e:
             logger.warning(f"风险等级计算失败: {e}")
             return "中"
+
+    def _generate_buy_sell_advice(self, stock_data: Dict, history_data: pd.DataFrame,
+                                      composite_score: float, risk_level: str,
+                                      signals: List) -> Dict:
+        """
+        生成详细的买卖操作建议
+
+        Args:
+            stock_data: 竞价数据
+            history_data: 历史数据
+            composite_score: 综合评分
+            risk_level: 风险等级
+            signals: 信号列表
+
+        Returns:
+            买卖建议字典，包含买入时机、买入价格、卖出时机、卖出价格、止盈止损等
+        """
+        try:
+            current_price = stock_data.get('bid_price', 0)
+            prev_close = stock_data.get('prev_close', current_price)
+            bid_change_pct = stock_data.get('bid_change_pct', 0)
+
+            # 计算关键价格位
+            support_price, resistance_price, ma5, ma10, ma20 = self._calculate_key_prices(history_data)
+
+            advice = {
+                'buy_condition': '',
+                'buy_price_range': '',
+                'buy_time': '',
+                'sell_condition': '',
+                'sell_price_target': '',
+                'sell_time': '',
+                'stop_loss': '',
+                'take_profit': '',
+                'holding_period': '',
+                'position_size': '',
+            }
+
+            # 根据评分和风险等级生成建议
+            if composite_score >= 75:
+                # 高分股票 - 积极买入建议
+                advice['buy_condition'] = '开盘后观察5-10分钟，若价格稳定在当前价位或小幅回调，可积极买入'
+                advice['buy_price_range'] = self._format_price_range(current_price * 0.98, current_price * 1.02)
+                advice['buy_time'] = '建议在9:30-9:40开盘初期买入，或等待开盘后首次回调时买入'
+                advice['sell_condition'] = '当出现明显滞涨信号或涨幅超过预期目标时卖出'
+                advice['sell_price_target'] = self._format_price_range(current_price * 1.05, current_price * 1.10)
+                advice['sell_time'] = '若早盘强势可持有至下午，若走弱则在上午11点前卖出'
+                advice['stop_loss'] = f'止损价: {current_price * 0.95:.2f}元 (跌幅约5%)'
+                advice['take_profit'] = f'止盈目标: {current_price * 1.08:.2f}元 (涨幅约8%)'
+                advice['holding_period'] = '短线持有1-3天，若趋势持续可延长'
+                advice['position_size'] = '建议仓位: 30%-40%'
+
+            elif composite_score >= 65:
+                # 中高分股票 - 适度买入建议
+                advice['buy_condition'] = '开盘观察15-20分钟，确认走势平稳后分批买入'
+                advice['buy_price_range'] = self._format_price_range(current_price * 0.97, current_price * 1.01)
+                advice['buy_time'] = '建议在9:35-10:00时段买入，避免开盘追高'
+                advice['sell_condition'] = '达到目标涨幅或出现技术破位信号时卖出'
+                advice['sell_price_target'] = self._format_price_range(current_price * 1.03, current_price * 1.06)
+                advice['sell_time'] = '当日涨幅达标可卖出，或持有至次日开盘'
+                advice['stop_loss'] = f'止损价: {current_price * 0.94:.2f}元 (跌幅约6%)'
+                advice['take_profit'] = f'止盈目标: {current_price * 1.05:.2f}元 (涨幅约5%)'
+                advice['holding_period'] = '短线持有1-2天'
+                advice['position_size'] = '建议仓位: 20%-30%'
+
+            elif composite_score >= 55:
+                # 中等分数股票 - 谨慎买入建议
+                advice['buy_condition'] = '开盘后观察30分钟以上，确认有成交量配合且走势向上时小仓位试探'
+                advice['buy_price_range'] = self._format_price_range(current_price * 0.96, current_price)
+                advice['buy_time'] = '建议在10:00-10:30时段，等待回调企稳后再买入'
+                advice['sell_condition'] = '涨幅达3%以上或走势转弱时及时卖出'
+                advice['sell_price_target'] = f'{current_price * 1.03:.2f}元附近'
+                advice['sell_time'] = '当日冲高回落前卖出，不建议过夜持有'
+                advice['stop_loss'] = f'止损价: {current_price * 0.93:.2f}元 (跌幅约7%)'
+                advice['take_profit'] = f'止盈目标: {current_price * 1.03:.2f}元 (涨幅约3%)'
+                advice['holding_period'] = '日内交易为主，不建议持有过夜'
+                advice['position_size'] = '建议仓位: 10%-15%'
+
+            elif composite_score >= 45:
+                # 中低分数股票 - 观望为主
+                advice['buy_condition'] = '暂不建议买入，等待更多确认信号'
+                advice['buy_price_range'] = '观望，不设买入区间'
+                advice['buy_time'] = '等待评分提升至55分以上再考虑'
+                advice['sell_condition'] = '若已持有，建议择机减仓'
+                advice['sell_price_target'] = f'{current_price:.2f}元附近止损离场'
+                advice['sell_time'] = '开盘后尽快处理持仓'
+                advice['stop_loss'] = f'止损价: {current_price * 0.92:.2f}元'
+                advice['take_profit'] = '不设止盈，优先止损'
+                advice['holding_period'] = '不建议持有'
+                advice['position_size'] = '建议仓位: 0%'
+
+            else:
+                # 低分股票 - 建议回避
+                advice['buy_condition'] = '不建议买入，风险较高'
+                advice['buy_price_range'] = '回避'
+                advice['buy_time'] = '不建议买入'
+                advice['sell_condition'] = '若已持有，建议尽快清仓'
+                advice['sell_price_target'] = f'{current_price:.2f}元附近清仓'
+                advice['sell_time'] = '开盘第一时间卖出'
+                advice['stop_loss'] = '已持有建议立即止损'
+                advice['take_profit'] = '不设止盈'
+                advice['holding_period'] = '不建议持有'
+                advice['position_size'] = '建议仓位: 0%'
+
+            # 根据风险等级调整建议
+            if risk_level == "高":
+                advice['position_size'] = self._reduce_position(advice['position_size'])
+                advice['stop_loss'] = f'止损价: {current_price * 0.92:.2f}元 (跌幅约8%，风险较高需更严格止损)'
+
+            # 根据技术信号补充建议
+            if resistance_price and resistance_price > current_price:
+                advice['sell_price_target'] = f'{resistance_price:.2f}元 (20日高点压力位附近)'
+            if support_price and support_price < current_price:
+                advice['buy_price_range'] = f'{support_price:.2f}元附近可考虑加仓 (支撑位)'
+
+            # 根据竞价涨幅调整
+            if bid_change_pct > 0.05:
+                advice['buy_time'] = '开盘涨幅较大，建议等待回调至' + f'{current_price * 0.98:.2f}元附近再买入'
+                advice['position_size'] = self._reduce_position(advice['position_size'])
+
+            return advice
+
+        except Exception as e:
+            logger.warning(f"买卖建议生成失败: {e}")
+            return {
+                'buy_condition': '暂无建议',
+                'sell_condition': '暂无建议'
+            }
+
+    def _calculate_key_prices(self, history_data: pd.DataFrame) -> Tuple:
+        """
+        计算关键价格位（支撑位、压力位、均线等）
+
+        Args:
+            history_data: 历史数据
+
+        Returns:
+            (支撑价, 压力价, MA5, MA10, MA20)
+        """
+        try:
+            if history_data.empty or len(history_data) < 5:
+                return (None, None, None, None, None)
+
+            close = history_data['收盘']
+
+            # 计算均线
+            ma5 = close.tail(5).mean()
+            ma10 = close.tail(10).mean() if len(close) >= 10 else ma5
+            ma20 = close.tail(20).mean() if len(close) >= 20 else ma10
+
+            # 计算支撑位（20日最低价附近）
+            low_20 = history_data['最低'].tail(20).min() if len(history_data) >= 20 else history_data['最低'].min()
+            support_price = low_20
+
+            # 计算压力位（20日最高价附近）
+            high_20 = history_data['最高'].tail(20).max() if len(history_data) >= 20 else history_data['最高'].max()
+            resistance_price = high_20
+
+            return (support_price, resistance_price, ma5, ma10, ma20)
+
+        except Exception as e:
+            logger.warning(f"关键价格计算失败: {e}")
+            return (None, None, None, None, None)
+
+    def _format_price_range(self, low: float, high: float) -> str:
+        """格式化价格区间"""
+        return f'{low:.2f}元 - {high:.2f}元'
+
+    def _reduce_position(self, position_str: str) -> str:
+        """降低仓位建议"""
+        # 简单处理：将仓位比例降低
+        if '30%-40%' in position_str:
+            return '建议仓位: 15%-20% (风险调降)'
+        elif '20%-30%' in position_str:
+            return '建议仓位: 10%-15% (风险调降)'
+        elif '10%-15%' in position_str:
+            return '建议仓位: 5%-10% (风险调降)'
+        return position_str
 
     def rank_stocks(self, stock_results: List[Dict]) -> List[Dict]:
         """

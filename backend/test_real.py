@@ -1,9 +1,13 @@
 """
 真实数据测试脚本 - 使用真实股票数据测试分析流程
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pathlib import Path
+
+# 使用 pathlib 确保跨平台路径兼容
+backend_path = Path(__file__).resolve().parent
+sys.path.insert(0, str(backend_path))
 
 import pandas as pd
 import numpy as np

@@ -1,6 +1,7 @@
 """
 集合竞价数据处理模块
 专注于9:15-9:25竞价时段的数据获取和分析
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import akshare as ak
 import pandas as pd
@@ -8,14 +9,17 @@ import numpy as np
 from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional, Tuple
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time as time_module
+from pathlib import Path
 import sys
-import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 使用 pathlib 确保跨平台路径兼容
+backend_path = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_path))
+
 from core.config import (
     PRE_MARKET_START, PRE_MARKET_END, MARKET_OPEN,
-    VOLUME_PRICE_THRESHOLDS, CACHE_DIR
+    VOLUME_PRICE_THRESHOLDS, get_cache_dir_path
 )
 from core.data_fetcher import DataFetcher
 
@@ -304,8 +308,6 @@ class PreMarketAnalyzer:
             callback: 每次更新后的回调函数
             interval: 更新间隔（秒）
         """
-        import time
-
         logger.info("开始监控集合竞价...")
 
         while self.is_pre_market_time():
@@ -313,9 +315,9 @@ class PreMarketAnalyzer:
                 data = self.get_bid_quotes()
                 if callback:
                     callback(data)
-                time.sleep(interval)
+                time_module.sleep(interval)
             except Exception as e:
                 logger.error(f"监控出错: {e}")
-                time.sleep(5)
+                time_module.sleep(5)
 
         logger.info("集合竞价时段结束")

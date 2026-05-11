@@ -1,6 +1,7 @@
 """
 股票智能分析引擎
 整合数据获取、竞价分析、策略评估，输出最终推荐结果
+跨平台兼容：支持 Windows、macOS、Linux
 """
 import pandas as pd
 import numpy as np
@@ -10,11 +11,14 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# 使用 pathlib 确保跨平台路径兼容
+backend_path = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(backend_path))
+
 from core.config import (
-    MAX_STOCK_PRICE, SELECT_TOP_N, CACHE_DIR,
+    MAX_STOCK_PRICE, SELECT_TOP_N, get_cache_dir_path,
     PRE_MARKET_START, PRE_MARKET_END, DATA_UPDATE_INTERVAL
 )
 from core.data_fetcher import DataFetcher
